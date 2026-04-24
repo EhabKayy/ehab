@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E.H.A.B. — Enhanced Human Athletic Biometrics</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #ff2020;
+    --red-dim: #991010;
+    --gold: #ffc400;
+    --gold-dim: #7a5d00;
+    --cyan: #00e5ff;
+    --bg: #07080d;
+    --panel: #0d1018;
+    --border: #1e2535;
+    --text: #c8d4e8;
+    --text-dim: #4a5a70;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--red);
+    text-shadow: 0 0 20px rgba(255,32,32,0.4);
+  }
+
+  .logo span { color: var(--gold); }
+
+  .header-mid {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-pill {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 2px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .status-pill.active {
+    background: rgba(0,229,255,0.08);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+  }
+
+  .status-pill.loading {
+    background: rgba(255,196,0,0.08);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    animation: blink 1.2s infinite;
+  }
+
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  .header-stats {
+    display: flex;
+    gap: 24px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .header-stats span { color: var(--gold); }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── VIDEO SECTION ── */
+  .video-section {
+    position: relative;
+    background: #000;
+    overflow: hidden;
+  }
+
+  .video-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  video { display: none; }
+
+  canvas#output {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+  }
+
+  /* HUD overlays on top of video */
+  .hud-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Corner brackets */
+  .corner {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+  }
+  .corner-tl { top: 16px; left: 16px; border-top: 2px solid var(--red); border-left: 2px solid var(--red); }
+  .corner-tr { top: 16px; right: 16px; border-top: 2px solid var(--red); border-right: 2px solid var(--red); }
+  .corner-bl { bottom: 16px; left: 16px; border-bottom: 2px solid var(--red); border-left: 2px solid var(--red); }
+  .corner-br { bottom: 16px; right: 16px; border-bottom: 2px solid var(--red); border-right: 2px solid var(--red); }
+
+  /* Angle arc display on video */
+  .angle-hud {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--cyan);
+    letter-spacing: 1px;
+  }
+
+  .angle-hud .label { color: var(--text-dim); font-size: 10px; letter-spacing: 2px; margin-bottom: 2px; }
+  .angle-hud .value { font-size: 28px; font-weight: bold; color: var(--cyan); }
+
+  /* Stage badge */
+  .stage-badge {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    letter-spacing: 3px;
+    padding: 6px 20px;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .stage-badge.down { background: rgba(255,32,32,0.15); border: 1px solid var(--red); color: var(--red); }
+  .stage-badge.up { background: rgba(0,229,255,0.12); border: 1px solid var(--cyan); color: var(--cyan); }
+  .stage-badge.neutral { background: rgba(30,37,53,0.8); border: 1px solid var(--border); color: var(--text-dim); }
+
+  /* Scanline effect */
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* No camera placeholder */
+  .no-camera {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+
+  .no-camera .icon {
+    width: 60px;
+    height: 60px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--text-dim);
+  }
+
+  /* ── RIGHT PANEL ── */
+  .panel {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .panel-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  /* Exercise picker */
+  .exercise-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .exercise-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 10px 14px;
+    border-radius: 2px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .exercise-btn:hover {
+    border-color: var(--red-dim);
+    color: #fff;
+    background: rgba(255,32,32,0.05);
+  }
+
+  .exercise-btn.active {
+    border-color: var(--red);
+    color: #fff;
+    background: rgba(255,32,32,0.1);
+  }
+
+  .exercise-btn .difficulty {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--gold);
+  }
+
+  /* Rep counter */
+  .rep-display {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .rep-number {
+    font-family: 'Orbitron', monospace;
+    font-size: 72px;
+    font-weight: 900;
+    color: var(--red);
+    line-height: 1;
+    text-shadow: 0 0 30px rgba(255,32,32,0.3);
+    transition: all 0.1s;
+  }
+
+  .rep-number.flash {
+    color: var(--gold);
+    text-shadow: 0 0 40px rgba(255,196,0,0.6);
+  }
+
+  .rep-unit {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .rep-target {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  .rep-target span { color: var(--gold); }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    background: rgba(255,255,255,0.04);
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--red);
+    border-radius: 2px;
+    transition: width 0.3s;
+    box-shadow: 0 0 8px rgba(255,32,32,0.5);
+  }
+
+  .reset-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 7px 14px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    width: 100%;
+  }
+
+  .reset-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(255,196,0,0.05);
+  }
+
+  /* Angle readout */
+  .angle-meters {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .angle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .angle-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    min-width: 28px;
+  }
+
+  .angle-bar-wrap {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .angle-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.15s;
+  }
+
+  .angle-bar-fill.left { background: var(--cyan); box-shadow: 0 0 6px rgba(0,229,255,0.4); }
+  .angle-bar-fill.right { background: var(--gold); box-shadow: 0 0 6px rgba(255,196,0,0.4); }
+
+  .angle-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* Form feedback */
+  .feedback-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    letter-spacing: 0.5px;
+    min-height: 70px;
+    transition: all 0.3s;
+  }
+
+  .feedback-box.good { border-color: rgba(0,229,255,0.4); color: var(--cyan); }
+  .feedback-box.warn { border-color: rgba(255,196,0,0.4); color: var(--gold); }
+  .feedback-box.idle { color: var(--text-dim); }
+
+  /* Sets tracker */
+  .sets-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .set-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .set-dot.done { background: rgba(255,32,32,0.15); border-color: var(--red); color: var(--red); }
+
+  /* Target selector */
+  .target-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .target-row label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    flex: 1;
+  }
+
+  .target-row input[type="range"] {
+    flex: 2;
+    accent-color: var(--red);
+    cursor: pointer;
+  }
+
+  .target-row span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--gold);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* Bottom footer */
+  footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 24px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+
+  footer .powered { color: var(--red-dim); }
+  footer .fps { color: var(--text-dim); }
+  footer .fps span { color: var(--cyan); }
+
+  /* Scrollbar */
+  .panel::-webkit-scrollbar { width: 3px; }
+  .panel::-webkit-scrollbar-track { background: transparent; }
+  .panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">E.H.A.B<span>.</span></div>
+  <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-left:-12px;margin-top:2px;">ENHANCED HUMAN ATHLETIC BIOMETRICS</div>
+  <div class="header-mid">
+    <div class="status-pill loading" id="statusPill">INITIALIZING</div>
+    <div class="header-stats">
+      SESSION <span id="sessionTime">00:00</span> &nbsp;|&nbsp;
+      CONFIDENCE <span id="confidence">--</span>
+    </div>
+  </div>
+  <div class="header-stats">
+    MEDIAPIPE POSE &nbsp;·&nbsp; REAL-TIME AI
+  </div>
+</header>
+
+<main>
+  <!-- ── VIDEO ── -->
+  <div class="video-section">
+    <div class="video-wrap">
+      <video id="webcam" playsinline></video>
+      <canvas id="output"></canvas>
+
+      <div class="hud-overlay">
+        <div class="corner corner-tl"></div>
+        <div class="corner corner-tr"></div>
+        <div class="corner corner-bl"></div>
+        <div class="corner corner-br"></div>
+
+        <div class="stage-badge neutral" id="stageBadge">READY</div>
+
+        <div class="angle-hud" id="primaryAngle">
+          <div class="label">ELBOW ANGLE</div>
+          <div class="value" id="angleDisplay">---°</div>
+        </div>
+
+        <div class="scanlines"></div>
+      </div>
+
+      <div class="no-camera" id="noCameraMsg">
+        <div class="icon">⚡</div>
+        <div>REQUESTING CAMERA ACCESS...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="panel">
+
+    <!-- Exercise Selector -->
+    <div class="panel-section">
+      <div class="section-label">Exercise Protocol</div>
+      <div class="exercise-list">
+        <button class="exercise-btn active" onclick="selectExercise('bicep')" id="btn-bicep">
+          Bicep Curl <span class="difficulty">LV1</span>
+        </button>
+        <button class="exercise-btn" onclick="selectExercise('shoulder')" id="btn-shoulder">
+          Shoulder Press <span class="difficulty">LV2</span>
+        </button>
+        <button class="exercise-btn" onclick="selectExercise('squat')" id="btn-squat">
+          Squat <span class="difficulty">LV2</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Rep Counter -->
+    <div class="panel-section">
+      <div class="section-label">Rep Counter</div>
+      <div class="rep-display">
+        <div class="rep-number" id="repNumber">0</div>
+        <div class="rep-unit">REPS</div>
+      </div>
+      <div class="rep-target">TARGET: <span id="targetDisplay">10</span> REPS</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+      </div>
+      <div class="target-row">
+        <label>TARGET</label>
+        <input type="range" min="5" max="30" value="10" step="1" id="targetSlider" oninput="updateTarget(this.value)">
+        <span id="targetVal">10</span>
+      </div>
+    </div>
+
+    <!-- Sets -->
+    <div class="panel-section">
+      <div class="section-label">Sets</div>
+      <div class="sets-row" id="setsRow">
+        <div class="set-dot" id="set-0" onclick="toggleSet(0)">1</div>
+        <div class="set-dot" id="set-1" onclick="toggleSet(1)">2</div>
+        <div class="set-dot" id="set-2" onclick="toggleSet(2)">3</div>
+        <div class="set-dot" id="set-3" onclick="toggleSet(3)">4</div>
+      </div>
+    </div>
+
+    <!-- Angle Meters -->
+    <div class="panel-section">
+      <div class="section-label">Joint Angles</div>
+      <div class="angle-meters">
+        <div class="angle-row">
+          <div class="angle-label">LEFT</div>
+          <div class="angle-bar-wrap">
+            <div class="angle-bar-fill left" id="leftBar" style="width:0%"></div>
+          </div>
+          <div class="angle-val" id="leftAngleVal">---°</div>
+        </div>
+        <div class="angle-row">
+          <div class="angle-label">RIGHT</div>
+          <div class="angle-bar-wrap">
+            <div class="angle-bar-fill right" id="rightBar" style="width:0%"></div>
+          </div>
+          <div class="angle-val" id="rightAngleVal">---°</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form Feedback -->
+    <div class="panel-section">
+      <div class="section-label">AI Form Analysis</div>
+      <div class="feedback-box idle" id="feedbackBox">
+        AWAITING POSE DETECTION...<br>
+        STAND IN FRONT OF CAMERA
+      </div>
+    </div>
+
+    <!-- Reset -->
+    <div class="panel-section">
+      <button class="reset-btn" onclick="resetReps()">[ RESET SESSION ]</button>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  <div class="powered">E.H.A.B. v1.0 — MEDIAPIPE POSE ENGINE</div>
+  <div class="fps">FPS <span id="fpsDisplay">--</span></div>
+</footer>
+
+<script>
+// ── STATE ──
+let reps = 0;
+let stage = null; // 'up' | 'down'
+let targetReps = 10;
+let currentExercise = 'bicep';
+let sessionStart = Date.now();
+let frameCount = 0;
+let lastFpsTime = Date.now();
+let fps = 0;
+let sessionInterval;
+let poseVisible = false;
+
+const exercises = {
+  bicep: {
+    name: 'Bicep Curl',
+    landmarks: { left: [11,13,15], right: [12,14,16] },
+    downAngle: 155,
+    upAngle: 55,
+    feedback: {
+      up: 'FULL CONTRACTION — SQUEEZE AT TOP',
+      down: 'CONTROLLED DESCENT — FEEL THE STRETCH',
+      mid: 'KEEP ELBOW LOCKED IN PLACE'
+    }
+  },
+  shoulder: {
+    name: 'Shoulder Press',
+    landmarks: { left: [11,13,15], right: [12,14,16] },
+    downAngle: 95,
+    upAngle: 155,
+    feedback: {
+      up: 'ARMS FULLY EXTENDED OVERHEAD',
+      down: 'LOWER TO SHOULDER HEIGHT',
+      mid: 'DRIVE THROUGH THE HEELS OF YOUR PALMS'
+    }
+  },
+  squat: {
+    name: 'Squat',
+    landmarks: { left: [23,25,27], right: [24,26,28] },
+    downAngle: 95,
+    upAngle: 160,
+    feedback: {
+      up: 'FULLY UPRIGHT — HIP EXTENSION COMPLETE',
+      down: 'PARALLEL OR BELOW — DEPTH ACHIEVED',
+      mid: 'DRIVE KNEES OUT — WEIGHT IN HEELS'
+    }
+  }
+};
+
+// ── HELPERS ──
+function calculateAngle(a, b, c) {
+  const rad = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+  let angle = Math.abs(rad * 180 / Math.PI);
+  if (angle > 180) angle = 360 - angle;
+  return angle;
+}
+
+function getLandmark(landmarks, idx) {
+  const lm = landmarks[idx];
+  return { x: lm.x, y: lm.y, z: lm.z || 0, visibility: lm.visibility || 0 };
+}
+
+function selectExercise(name) {
+  currentExercise = name;
+  reps = 0;
+  stage = null;
+  document.getElementById('repNumber').textContent = '0';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('stageBadge').className = 'stage-badge neutral';
+  document.getElementById('stageBadge').textContent = 'READY';
+  document.getElementById('feedbackBox').className = 'feedback-box idle';
+  document.getElementById('feedbackBox').textContent = 'SELECT AN EXERCISE AND BEGIN';
+
+  // Update button states
+  ['bicep','shoulder','squat'].forEach(e => {
+    document.getElementById('btn-'+e).classList.toggle('active', e === name);
+  });
+}
+
+function resetReps() {
+  reps = 0;
+  stage = null;
+  sessionStart = Date.now();
+  document.getElementById('repNumber').textContent = '0';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('repNumber').classList.remove('flash');
+}
+
+function updateTarget(val) {
+  targetReps = parseInt(val);
+  document.getElementById('targetDisplay').textContent = val;
+  document.getElementById('targetVal').textContent = val;
+  const pct = Math.min(reps / targetReps * 100, 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+function toggleSet(i) {
+  const el = document.getElementById('set-' + i);
+  el.classList.toggle('done');
+}
+
+function flashRep() {
+  const el = document.getElementById('repNumber');
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 300);
+}
+
+// ── SESSION TIMER ──
+sessionInterval = setInterval(() => {
+  const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+  const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('sessionTime').textContent = m + ':' + s;
+}, 1000);
+
+// ── MEDIAPIPE SETUP ──
+const videoEl = document.getElementById('webcam');
+const canvasEl = document.getElementById('output');
+const ctx = canvasEl.getContext('2d');
+
+const pose = new Pose({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+});
+
+pose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  enableSegmentation: false,
+  smoothSegmentation: false,
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6
+});
+
+pose.onResults(onResults);
+
+// ── DRAWING ──
+function onResults(results) {
+  // FPS
+  frameCount++;
+  const now = Date.now();
+  if (now - lastFpsTime > 1000) {
+    fps = Math.round(frameCount * 1000 / (now - lastFpsTime));
+    document.getElementById('fpsDisplay').textContent = fps;
+    frameCount = 0;
+    lastFpsTime = now;
+  }
+
+  canvasEl.width = results.image.width;
+  canvasEl.height = results.image.height;
+
+  // Draw camera feed (mirrored via CSS)
+  ctx.save();
+  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  ctx.drawImage(results.image, 0, 0, canvasEl.width, canvasEl.height);
+
+  if (results.poseLandmarks) {
+    poseVisible = true;
+    document.getElementById('noCameraMsg').style.display = 'none';
+
+    // Draw skeleton with custom Iron Man style
+    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
+      color: 'rgba(255, 32, 32, 0.6)',
+      lineWidth: 2
+    });
+    drawLandmarks(ctx, results.poseLandmarks, {
+      color: 'rgba(0, 229, 255, 0.9)',
+      lineWidth: 1,
+      radius: 4
+    });
+
+    // Process exercise
+    processExercise(results.poseLandmarks);
+
+    // Update confidence
+    const visibilities = results.poseLandmarks.map(l => l.visibility || 0);
+    const avgVis = visibilities.reduce((a,b) => a+b, 0) / visibilities.length;
+    document.getElementById('confidence').textContent = Math.round(avgVis * 100) + '%';
+
+  } else {
+    poseVisible = false;
+    document.getElementById('confidence').textContent = '--';
+    document.getElementById('angleDisplay').textContent = '---°';
+    document.getElementById('leftAngleVal').textContent = '---°';
+    document.getElementById('rightAngleVal').textContent = '---°';
+    document.getElementById('leftBar').style.width = '0%';
+    document.getElementById('rightBar').style.width = '0%';
+    document.getElementById('feedbackBox').className = 'feedback-box idle';
+    document.getElementById('feedbackBox').textContent = 'POSE NOT DETECTED\nMOVE INTO FRAME';
+    document.getElementById('stageBadge').className = 'stage-badge neutral';
+    document.getElementById('stageBadge').textContent = 'NO SIGNAL';
+  }
+
+  ctx.restore();
+}
+
+function processExercise(landmarks) {
+  const ex = exercises[currentExercise];
+  const { left, right } = ex.landmarks;
+
+  // Get points (note: x/y are normalized 0-1)
+  const lA = getLandmark(landmarks, left[0]);
+  const lB = getLandmark(landmarks, left[1]);
+  const lC = getLandmark(landmarks, left[2]);
+  const rA = getLandmark(landmarks, right[0]);
+  const rB = getLandmark(landmarks, right[1]);
+  const rC = getLandmark(landmarks, right[2]);
+
+  const leftAngle = calculateAngle(lA, lB, lC);
+  const rightAngle = calculateAngle(rA, rB, rC);
+
+  // Use primary arm (left for display, average for rep counting)
+  const primaryAngle = Math.round((leftAngle + rightAngle) / 2);
+
+  // Update UI angle displays
+  document.getElementById('angleDisplay').textContent = primaryAngle + '°';
+  document.getElementById('leftAngleVal').textContent = Math.round(leftAngle) + '°';
+  document.getElementById('rightAngleVal').textContent = Math.round(rightAngle) + '°';
+  document.getElementById('leftBar').style.width = Math.min(leftAngle / 180 * 100, 100) + '%';
+  document.getElementById('rightBar').style.width = Math.min(rightAngle / 180 * 100, 100) + '%';
+
+  // Stage detection
+  const badge = document.getElementById('stageBadge');
+  const feedback = document.getElementById('feedbackBox');
+
+  if (primaryAngle > ex.downAngle) {
+    stage = 'down';
+    badge.className = 'stage-badge down';
+    badge.textContent = 'EXTEND';
+    feedback.className = 'feedback-box warn';
+    feedback.textContent = ex.feedback.down;
+  }
+
+  if (primaryAngle < ex.upAngle && stage === 'down') {
+    stage = 'up';
+    reps++;
+    badge.className = 'stage-badge up';
+    badge.textContent = 'CONTRACT';
+    feedback.className = 'feedback-box good';
+    feedback.textContent = ex.feedback.up + '\n\nREP ' + reps + ' COMPLETE';
+
+    document.getElementById('repNumber').textContent = reps;
+    const pct = Math.min(reps / targetReps * 100, 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    flashRep();
+
+    if (reps >= targetReps) {
+      feedback.textContent = 'SET COMPLETE! TARGET REACHED.\nREST 60s BEFORE NEXT SET.';
+    }
+  } else if (primaryAngle >= ex.upAngle && primaryAngle <= ex.downAngle) {
+    if (!stage) {
+      badge.className = 'stage-badge neutral';
+      badge.textContent = 'START';
+      feedback.className = 'feedback-box idle';
+      feedback.textContent = ex.feedback.mid;
+    }
+  }
+}
+
+// ── CAMERA ──
+async function startCamera() {
+  const statusPill = document.getElementById('statusPill');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+    });
+    videoEl.srcObject = stream;
+    videoEl.play();
+    document.getElementById('noCameraMsg').style.display = 'none';
+    statusPill.className = 'status-pill active';
+    statusPill.textContent = 'TRACKING ACTIVE';
+
+    const camera = new Camera(videoEl, {
+      onFrame: async () => {
+        await pose.send({ image: videoEl });
+      },
+      width: 1280,
+      height: 720
+    });
+    camera.start();
+
+  } catch (err) {
+    document.getElementById('noCameraMsg').innerHTML = `
+      <div class="icon">!</div>
+      <div>CAMERA ACCESS DENIED</div>
+      <div style="font-size:10px;color:#2a3a50;">ALLOW CAMERA PERMISSION TO CONTINUE</div>
+    `;
+    statusPill.className = 'status-pill loading';
+    statusPill.textContent = 'CAMERA ERROR';
+  }
+}
+
+startCamera();
+</script>
+</body>
+</html>
