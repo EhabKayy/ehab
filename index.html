@@ -657,7 +657,6 @@ let frameCount = 0;
 let lastFpsTime = Date.now();
 let fps = 0;
 let sessionInterval;
-let poseVisible = false;
 
 const exercises = {
   bicep: {
@@ -717,7 +716,10 @@ function selectExercise(name) {
   document.getElementById('stageBadge').className = 'stage-badge neutral';
   document.getElementById('stageBadge').textContent = 'READY';
   document.getElementById('feedbackBox').className = 'feedback-box idle';
-  document.getElementById('feedbackBox').textContent = 'SELECT AN EXERCISE AND BEGIN';
+  // Switch the big on-screen angle label to match the joint being measured
+  const angleLabels = { bicep: 'ELBOW ANGLE', shoulder: 'ELBOW ANGLE', squat: 'KNEE ANGLE' };
+  document.querySelector('#primaryAngle .label').textContent = angleLabels[name] || 'JOINT ANGLE';
+  document.getElementById('feedbackBox').textContent = 'READY — BEGIN ' + exercises[name].name.toUpperCase();
 
   // Update button states
   ['bicep','shoulder','squat'].forEach(e => {
@@ -802,7 +804,6 @@ function onResults(results) {
   ctx.drawImage(results.image, 0, 0, canvasEl.width, canvasEl.height);
 
   if (results.poseLandmarks) {
-    poseVisible = true;
     document.getElementById('noCameraMsg').style.display = 'none';
 
     // Draw skeleton with custom Iron Man style
@@ -825,7 +826,6 @@ function onResults(results) {
     document.getElementById('confidence').textContent = Math.round(avgVis * 100) + '%';
 
   } else {
-    poseVisible = false;
     document.getElementById('confidence').textContent = '--';
     document.getElementById('angleDisplay').textContent = '---°';
     document.getElementById('leftAngleVal').textContent = '---°';
@@ -856,8 +856,10 @@ function processExercise(landmarks) {
   const leftAngle = calculateAngle(lA, lB, lC);
   const rightAngle = calculateAngle(rA, rB, rC);
 
-  // Use primary arm (left for display, average for rep counting)
-  const primaryAngle = Math.round((leftAngle + rightAngle) / 2);
+  // Use the MOST-FLEXED arm as the primary driver so single-arm exercises
+  // (bicep / shoulder press done one side at a time) count correctly, and
+  // squats still work because both legs flex together.
+  const primaryAngle = Math.round(Math.min(leftAngle, rightAngle));
 
   // Update UI angle displays
   document.getElementById('angleDisplay').textContent = primaryAngle + '°';
@@ -866,36 +868,44 @@ function processExercise(landmarks) {
   document.getElementById('leftBar').style.width = Math.min(leftAngle / 180 * 100, 100) + '%';
   document.getElementById('rightBar').style.width = Math.min(rightAngle / 180 * 100, 100) + '%';
 
-  // Stage detection
+  // Robust rep detection via MIDPOINT HYSTERESIS.
+  // Absolute thresholds (e.g. standing knee < 160°) are never reliably reached
+  // for every body, so we toggle "extend"/"contract" around the midpoint of the
+  // exercise's angle range. This counts reps for any proportion and avoids
+  // double-counting (a rep only fires on the extend->contract transition).
+  const mid = (ex.upAngle + ex.downAngle) / 2;
+
   const badge = document.getElementById('stageBadge');
   const feedback = document.getElementById('feedbackBox');
 
-  if (primaryAngle > ex.downAngle) {
-    stage = 'down';
-    badge.className = 'stage-badge down';
-    badge.textContent = 'EXTEND';
-    feedback.className = 'feedback-box warn';
-    feedback.textContent = ex.feedback.down;
-  }
-
-  if (primaryAngle < ex.upAngle && stage === 'down') {
-    stage = 'up';
-    reps++;
-    badge.className = 'stage-badge up';
-    badge.textContent = 'CONTRACT';
-    feedback.className = 'feedback-box good';
-    feedback.textContent = ex.feedback.up + '\n\nREP ' + reps + ' COMPLETE';
-
-    document.getElementById('repNumber').textContent = reps;
-    const pct = Math.min(reps / targetReps * 100, 100);
-    document.getElementById('progressBar').style.width = pct + '%';
-    flashRep();
-
-    if (reps >= targetReps) {
-      feedback.textContent = 'SET COMPLETE! TARGET REACHED.\nREST 60s BEFORE NEXT SET.';
+  if (primaryAngle > mid) {
+    // Extended / far position
+    if (stage !== 'down') {
+      stage = 'down';
+      badge.className = 'stage-badge down';
+      badge.textContent = 'EXTEND';
+      feedback.className = 'feedback-box warn';
+      feedback.textContent = ex.feedback.down;
     }
-  } else if (primaryAngle >= ex.upAngle && primaryAngle <= ex.downAngle) {
-    if (!stage) {
+  } else {
+    // Contracted / near position
+    if (stage === 'down') {
+      stage = 'up';
+      reps++;
+      badge.className = 'stage-badge up';
+      badge.textContent = 'CONTRACT';
+      feedback.className = 'feedback-box good';
+      feedback.textContent = ex.feedback.up + '\n\nREP ' + reps + ' COMPLETE';
+
+      document.getElementById('repNumber').textContent = reps;
+      const pct = Math.min(reps / targetReps * 100, 100);
+      document.getElementById('progressBar').style.width = pct + '%';
+      flashRep();
+
+      if (reps >= targetReps) {
+        feedback.textContent = 'SET COMPLETE! TARGET REACHED.\nREST 60s BEFORE NEXT SET.';
+      }
+    } else if (!stage) {
       badge.className = 'stage-badge neutral';
       badge.textContent = 'START';
       feedback.className = 'feedback-box idle';
@@ -912,25 +922,36 @@ async function startCamera() {
       video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
     });
     videoEl.srcObject = stream;
-    videoEl.play();
+    await videoEl.play();
     document.getElementById('noCameraMsg').style.display = 'none';
     statusPill.className = 'status-pill active';
     statusPill.textContent = 'TRACKING ACTIVE';
 
-    const camera = new Camera(videoEl, {
-      onFrame: async () => {
-        await pose.send({ image: videoEl });
-      },
-      width: 1280,
-      height: 720
+    await new Promise(resolve => {
+      if (videoEl.videoWidth > 0) return resolve();
+      videoEl.addEventListener('loadeddata', resolve, { once: true });
     });
-    camera.start();
+
+    let sending = false;
+    async function sendFrame() {
+      if (!sending && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+        sending = true;
+        try { await pose.send({ image: videoEl }); }
+        catch(e) { console.error('pose error:', e); }
+        sending = false;
+      }
+      requestAnimationFrame(sendFrame);
+    }
+    requestAnimationFrame(sendFrame);
 
   } catch (err) {
+    console.error('Camera error:', err);
+    document.getElementById('noCameraMsg').style.display = 'flex';
     document.getElementById('noCameraMsg').innerHTML = `
       <div class="icon">!</div>
       <div>CAMERA ACCESS DENIED</div>
       <div style="font-size:10px;color:#2a3a50;">ALLOW CAMERA PERMISSION TO CONTINUE</div>
+      <button class="reset-btn" style="margin-top:14px;width:auto;" onclick="startCamera()">[ RETRY CAMERA ]</button>
     `;
     statusPill.className = 'status-pill loading';
     statusPill.textContent = 'CAMERA ERROR';
