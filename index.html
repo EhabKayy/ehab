@@ -12,16 +12,16 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --red: #ff2020;
-    --red-dim: #991010;
-    --gold: #ffc400;
-    --gold-dim: #7a5d00;
-    --cyan: #00e5ff;
-    --bg: #07080d;
-    --panel: #0d1018;
-    --border: #1e2535;
-    --text: #c8d4e8;
-    --text-dim: #4a5a70;
+    --blue: #0a84ff;
+    --blue-bright: #1e9bff;
+    --blue-dim: #0a4d99;
+    --white: #e8eef7;
+    --white-dim: #7c879b;
+    --bg: #15171c;
+    --panel: #1c1f26;
+    --border: #2b2f3a;
+    --text: #e8eef7;
+    --text-dim: #7c879b;
   }
 
   body {
@@ -50,11 +50,11 @@
     font-size: 22px;
     font-weight: 900;
     letter-spacing: 4px;
-    color: var(--red);
-    text-shadow: 0 0 20px rgba(255,32,32,0.4);
+    color: var(--blue);
+    text-shadow: 0 0 20px rgba(10,132,255,0.4);
   }
 
-  .logo span { color: var(--gold); }
+  .logo span { color: var(--white); }
 
   .header-mid {
     display: flex;
@@ -72,15 +72,15 @@
   }
 
   .status-pill.active {
-    background: rgba(0,229,255,0.08);
-    border: 1px solid var(--cyan);
-    color: var(--cyan);
+    background: rgba(30,155,255,0.08);
+    border: 1px solid var(--blue-bright);
+    color: var(--blue-bright);
   }
 
   .status-pill.loading {
-    background: rgba(255,196,0,0.08);
-    border: 1px solid var(--gold);
-    color: var(--gold);
+    background: rgba(232,238,247,0.08);
+    border: 1px solid var(--white);
+    color: var(--white);
     animation: blink 1.2s infinite;
   }
 
@@ -95,7 +95,7 @@
     letter-spacing: 1px;
   }
 
-  .header-stats span { color: var(--gold); }
+  .header-stats span { color: var(--white); }
 
   /* ── MAIN LAYOUT ── */
   main {
@@ -141,10 +141,10 @@
     width: 28px;
     height: 28px;
   }
-  .corner-tl { top: 16px; left: 16px; border-top: 2px solid var(--red); border-left: 2px solid var(--red); }
-  .corner-tr { top: 16px; right: 16px; border-top: 2px solid var(--red); border-right: 2px solid var(--red); }
-  .corner-bl { bottom: 16px; left: 16px; border-bottom: 2px solid var(--red); border-left: 2px solid var(--red); }
-  .corner-br { bottom: 16px; right: 16px; border-bottom: 2px solid var(--red); border-right: 2px solid var(--red); }
+  .corner-tl { top: 16px; left: 16px; border-top: 2px solid var(--blue); border-left: 2px solid var(--blue); }
+  .corner-tr { top: 16px; right: 16px; border-top: 2px solid var(--blue); border-right: 2px solid var(--blue); }
+  .corner-bl { bottom: 16px; left: 16px; border-bottom: 2px solid var(--blue); border-left: 2px solid var(--blue); }
+  .corner-br { bottom: 16px; right: 16px; border-bottom: 2px solid var(--blue); border-right: 2px solid var(--blue); }
 
   /* Angle arc display on video */
   .angle-hud {
@@ -153,12 +153,12 @@
     left: 24px;
     font-family: 'Share Tech Mono', monospace;
     font-size: 13px;
-    color: var(--cyan);
+    color: var(--blue-bright);
     letter-spacing: 1px;
   }
 
   .angle-hud .label { color: var(--text-dim); font-size: 10px; letter-spacing: 2px; margin-bottom: 2px; }
-  .angle-hud .value { font-size: 28px; font-weight: bold; color: var(--cyan); }
+  .angle-hud .value { font-size: 28px; font-weight: bold; color: var(--blue-bright); }
 
   /* Stage badge */
   .stage-badge {
@@ -174,9 +174,9 @@
     transition: all 0.2s;
   }
 
-  .stage-badge.down { background: rgba(255,32,32,0.15); border: 1px solid var(--red); color: var(--red); }
-  .stage-badge.up { background: rgba(0,229,255,0.12); border: 1px solid var(--cyan); color: var(--cyan); }
-  .stage-badge.neutral { background: rgba(30,37,53,0.8); border: 1px solid var(--border); color: var(--text-dim); }
+  .stage-badge.down { background: rgba(10,132,255,0.15); border: 1px solid var(--blue); color: var(--blue); }
+  .stage-badge.up { background: rgba(30,155,255,0.12); border: 1px solid var(--blue-bright); color: var(--blue-bright); }
+  .stage-badge.neutral { background: rgba(43,47,58,0.8); border: 1px solid var(--border); color: var(--text-dim); }
 
   /* Scanline effect */
   .scanlines {
@@ -269,22 +269,22 @@
   }
 
   .exercise-btn:hover {
-    border-color: var(--red-dim);
+    border-color: var(--blue-dim);
     color: #fff;
-    background: rgba(255,32,32,0.05);
+    background: rgba(10,132,255,0.05);
   }
 
   .exercise-btn.active {
-    border-color: var(--red);
+    border-color: var(--blue);
     color: #fff;
-    background: rgba(255,32,32,0.1);
+    background: rgba(10,132,255,0.1);
   }
 
   .exercise-btn .difficulty {
     font-family: 'Share Tech Mono', monospace;
     font-size: 10px;
     letter-spacing: 1px;
-    color: var(--gold);
+    color: var(--white);
   }
 
   /* Rep counter */
@@ -299,15 +299,15 @@
     font-family: 'Orbitron', monospace;
     font-size: 72px;
     font-weight: 900;
-    color: var(--red);
+    color: var(--blue);
     line-height: 1;
-    text-shadow: 0 0 30px rgba(255,32,32,0.3);
+    text-shadow: 0 0 30px rgba(10,132,255,0.3);
     transition: all 0.1s;
   }
 
   .rep-number.flash {
-    color: var(--gold);
-    text-shadow: 0 0 40px rgba(255,196,0,0.6);
+    color: var(--white);
+    text-shadow: 0 0 40px rgba(232,238,247,0.6);
   }
 
   .rep-unit {
@@ -325,7 +325,7 @@
     margin-bottom: 10px;
   }
 
-  .rep-target span { color: var(--gold); }
+  .rep-target span { color: var(--white); }
 
   /* Progress bar */
   .progress-bar-wrap {
@@ -338,10 +338,10 @@
 
   .progress-bar-fill {
     height: 100%;
-    background: var(--red);
+    background: var(--blue);
     border-radius: 2px;
     transition: width 0.3s;
-    box-shadow: 0 0 8px rgba(255,32,32,0.5);
+    box-shadow: 0 0 8px rgba(10,132,255,0.5);
   }
 
   .reset-btn {
@@ -360,9 +360,9 @@
   }
 
   .reset-btn:hover {
-    border-color: var(--gold);
-    color: var(--gold);
-    background: rgba(255,196,0,0.05);
+    border-color: var(--white);
+    color: var(--white);
+    background: rgba(232,238,247,0.05);
   }
 
   /* Angle readout */
@@ -400,8 +400,8 @@
     transition: width 0.15s;
   }
 
-  .angle-bar-fill.left { background: var(--cyan); box-shadow: 0 0 6px rgba(0,229,255,0.4); }
-  .angle-bar-fill.right { background: var(--gold); box-shadow: 0 0 6px rgba(255,196,0,0.4); }
+  .angle-bar-fill.left { background: var(--blue-bright); box-shadow: 0 0 6px rgba(30,155,255,0.4); }
+  .angle-bar-fill.right { background: var(--white); box-shadow: 0 0 6px rgba(232,238,247,0.4); }
 
   .angle-val {
     font-family: 'Share Tech Mono', monospace;
@@ -425,8 +425,8 @@
     transition: all 0.3s;
   }
 
-  .feedback-box.good { border-color: rgba(0,229,255,0.4); color: var(--cyan); }
-  .feedback-box.warn { border-color: rgba(255,196,0,0.4); color: var(--gold); }
+  .feedback-box.good { border-color: rgba(30,155,255,0.4); color: var(--blue-bright); }
+  .feedback-box.warn { border-color: rgba(232,238,247,0.4); color: var(--white); }
   .feedback-box.idle { color: var(--text-dim); }
 
   /* Sets tracker */
@@ -451,7 +451,7 @@
     transition: all 0.2s;
   }
 
-  .set-dot.done { background: rgba(255,32,32,0.15); border-color: var(--red); color: var(--red); }
+  .set-dot.done { background: rgba(10,132,255,0.15); border-color: var(--blue); color: var(--blue); }
 
   /* Target selector */
   .target-row {
@@ -471,14 +471,14 @@
 
   .target-row input[type="range"] {
     flex: 2;
-    accent-color: var(--red);
+    accent-color: var(--blue);
     cursor: pointer;
   }
 
   .target-row span {
     font-family: 'Share Tech Mono', monospace;
     font-size: 12px;
-    color: var(--gold);
+    color: var(--white);
     min-width: 28px;
     text-align: right;
   }
@@ -498,9 +498,9 @@
     flex-shrink: 0;
   }
 
-  footer .powered { color: var(--red-dim); }
+  footer .powered { color: var(--blue-dim); }
   footer .fps { color: var(--text-dim); }
-  footer .fps span { color: var(--cyan); }
+  footer .fps span { color: var(--blue-bright); }
 
   /* Scrollbar */
   .panel::-webkit-scrollbar { width: 3px; }
@@ -808,11 +808,11 @@ function onResults(results) {
 
     // Draw skeleton with custom Iron Man style
     drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
-      color: 'rgba(255, 32, 32, 0.6)',
+      color: 'rgba(10, 132, 255, 0.6)',
       lineWidth: 2
     });
     drawLandmarks(ctx, results.poseLandmarks, {
-      color: 'rgba(0, 229, 255, 0.9)',
+      color: 'rgba(30, 155, 255, 0.9)',
       lineWidth: 1,
       radius: 4
     });
@@ -950,7 +950,7 @@ async function startCamera() {
     document.getElementById('noCameraMsg').innerHTML = `
       <div class="icon">!</div>
       <div>CAMERA ACCESS DENIED</div>
-      <div style="font-size:10px;color:#2a3a50;">ALLOW CAMERA PERMISSION TO CONTINUE</div>
+      <div style="font-size:10px;color:#5a6b85;">ALLOW CAMERA PERMISSION TO CONTINUE</div>
       <button class="reset-btn" style="margin-top:14px;width:auto;" onclick="startCamera()">[ RETRY CAMERA ]</button>
     `;
     statusPill.className = 'status-pill loading';
